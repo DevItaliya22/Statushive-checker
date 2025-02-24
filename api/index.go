@@ -41,7 +41,7 @@ func flushDNS() error {
 	if runtime.GOOS == "windows" {
 		cmd = exec.Command("ipconfig", "/flushdns")
 	} else {
-		cmd = exec.Command("systemd-resolve", "--flush-caches")
+		cmd = exec.Command("resolvectl", "flush-caches")
 	}
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to flush DNS: %v", err)
