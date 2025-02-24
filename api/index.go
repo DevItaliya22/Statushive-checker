@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptrace"
-	"os/exec"
 	"time"
 )
 
@@ -23,23 +22,41 @@ type ResponseData struct {
 	TotalTime       int64 `json:"total_time_ms"`
 }
 
-func traceURL(url string) (*ResponseData, error) {
-	cmd := exec.Command("ipconfig", "/flushdns")
-    fmt.Println("Flushing DNS cache", cmd)
-	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("failed to flush DNS: %v", err)
-	}
+type Timing struct {
+	DnsStart           int64
+	DnsDone            int64
+	ConnectStart       int64
+	ConnectDone        int64
+	TlsHandshakeStart  int64
+	TlsHandshakeDone   int64
+	FirstByteStart     int64
+	FirstByteDone      int64
+	TransferStart      int64
+}
 
-	var dnsStart, dnsEnd, connectStart, connectEnd, tlsStart, tlsEnd, firstByte time.Time
-	t0 := time.Now()
+func traceURL(url string) (*ResponseData, error) {
+	// cmd := exec.Command("ipconfig", "/flushdns")
+	// fmt.Println("Flushing DNS cache", cmd)
+	// if err := cmd.Run(); err != nil {
+	// 	return nil, fmt.Errorf("failed to flush DNS: %v", err)
+	// }
+
+	timing := &Timing{}
+	t0 := time.Now().UTC().UnixMilli()
 	trace := &httptrace.ClientTrace{
-		DNSStart:           func(httptrace.DNSStartInfo) { dnsStart = time.Now() },
-		DNSDone:            func(httptrace.DNSDoneInfo) { dnsEnd = time.Now() },
-		ConnectStart:       func(string, string) { connectStart = time.Now() },
-		ConnectDone:        func(string, string, error) { connectEnd = time.Now() },
-		TLSHandshakeStart:  func() { tlsStart = time.Now() },
-		TLSHandshakeDone:   func(tls.ConnectionState, error) { tlsEnd = time.Now() },
-		GotFirstResponseByte: func() { firstByte = time.Now() },
+		DNSStart:          func(_ httptrace.DNSStartInfo) { timing.DnsStart = time.Now().UTC().UnixMilli() },
+		DNSDone:           func(_ httptrace.DNSDoneInfo) { timing.DnsDone = time.Now().UTC().UnixMilli() },
+		ConnectStart:      func(_, _ string) { timing.ConnectStart = time.Now().UTC().UnixMilli() },
+		ConnectDone:       func(_, _ string, _ error) { timing.ConnectDone = time.Now().UTC().UnixMilli() },
+		TLSHandshakeStart: func() { timing.TlsHandshakeStart = time.Now().UTC().UnixMilli() },
+		TLSHandshakeDone:  func(_ tls.ConnectionState, _ error) { timing.TlsHandshakeDone = time.Now().UTC().UnixMilli() },
+		GotConn: func(_ httptrace.GotConnInfo) {
+			timing.FirstByteStart = time.Now().UTC().UnixMilli()
+		},
+		GotFirstResponseByte: func() {
+			timing.FirstByteDone = time.Now().UTC().UnixMilli()
+			timing.TransferStart = time.Now().UTC().UnixMilli()
+		},
 	}
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -54,14 +71,14 @@ func traceURL(url string) (*ResponseData, error) {
 	}
 	defer resp.Body.Close()
 	io.Copy(io.Discard, resp.Body)
-	t1 := time.Now()
+	t1 := time.Now().UTC().UnixMilli()
 
 	return &ResponseData{
-		DNSLookup:       dnsEnd.Sub(dnsStart).Milliseconds(),
-		TCPConnect:      connectEnd.Sub(connectStart).Milliseconds(),
-		TLSHandshake:    tlsEnd.Sub(tlsStart).Milliseconds(),
-		TimeToFirstByte: firstByte.Sub(t0).Milliseconds(),
-		TotalTime:       t1.Sub(t0).Milliseconds(),
+		DNSLookup:       timing.DnsDone - timing.DnsStart,
+		TCPConnect:      timing.ConnectDone - timing.ConnectStart,
+		TLSHandshake:    timing.TlsHandshakeDone - timing.TlsHandshakeStart,
+		TimeToFirstByte: timing.FirstByteDone - t0,
+		TotalTime:       t1 - t0,
 	}, nil
 }
 
