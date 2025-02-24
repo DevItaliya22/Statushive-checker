@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptrace"
 	"time"
+	"runtime"
 	"os/exec"
 )
 
@@ -35,10 +36,21 @@ type Timing struct {
 	TransferStart      int64
 }
 
-func traceURL(url string) (*ResponseData, error) {
-	cmd := exec.Command("ipconfig", "/flushdns")
-	fmt.Println("Flushing DNS cache", cmd)
+func flushDNS() error {
+	var cmd *exec.Cmd
+	if runtime.GOOS == "windows" {
+		cmd = exec.Command("ipconfig", "/flushdns")
+	} else {
+		cmd = exec.Command("systemd-resolve", "--flush-caches")
+	}
 	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to flush DNS: %v", err)
+	}
+	return nil
+}
+
+func traceURL(url string) (*ResponseData, error) {
+	if err := flushDNS(); err != nil {
 		return nil, fmt.Errorf("failed to flush DNS: %v", err)
 	}
 
@@ -82,6 +94,7 @@ func traceURL(url string) (*ResponseData, error) {
 		TotalTime:       t1 - t0,
 	}, nil
 }
+
 
 func Handler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
