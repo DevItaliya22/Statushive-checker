@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptrace"
 	"time"
+	"os/exec"
 )
 
 type RequestData struct {
@@ -35,11 +36,11 @@ type Timing struct {
 }
 
 func traceURL(url string) (*ResponseData, error) {
-	// cmd := exec.Command("ipconfig", "/flushdns")
-	// fmt.Println("Flushing DNS cache", cmd)
-	// if err := cmd.Run(); err != nil {
-	// 	return nil, fmt.Errorf("failed to flush DNS: %v", err)
-	// }
+	cmd := exec.Command("ipconfig", "/flushdns")
+	fmt.Println("Flushing DNS cache", cmd)
+	if err := cmd.Run(); err != nil {
+		return nil, fmt.Errorf("failed to flush DNS: %v", err)
+	}
 
 	timing := &Timing{}
 	t0 := time.Now().UTC().UnixMilli()
