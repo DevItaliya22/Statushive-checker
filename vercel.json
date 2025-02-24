@@ -1,5 +1,5 @@
 {
-    "regions": ["kix1"],
+    "regions": ["cpt1"],
     "routes": [
       {
         "src": "/(.*)",

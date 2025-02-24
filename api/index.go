@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"net/http/httptrace"
 	"time"
-	"runtime"
-	"os/exec"
+	// "runtime"
+	// "os/exec"
 )
 
 type RequestData struct {
@@ -36,24 +36,24 @@ type Timing struct {
 	TransferStart      int64
 }
 
-func flushDNS() error {
-	var cmd *exec.Cmd
-	if runtime.GOOS == "windows" {
-		cmd = exec.Command("ipconfig", "/flushdns")
-	} else {
-		cmd = exec.Command("resolvectl", "flush-caches")
-	}
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to flush DNS: %v", err)
-	}
-	return nil
-}
+// func flushDNS() error {
+// 	var cmd *exec.Cmd
+// 	if runtime.GOOS == "windows" {
+// 		cmd = exec.Command("ipconfig", "/flushdns")
+// 	} else {
+// 		cmd = exec.Command("resolvectl", "flush-caches")
+// 	}
+// 	if err := cmd.Run(); err != nil {
+// 		return fmt.Errorf("failed to flush DNS: %v", err)
+// 	}
+// 	return nil
+// }
+// aum tatsat
 
 func traceURL(url string) (*ResponseData, error) {
-	if err := flushDNS(); err != nil {
-		return nil, fmt.Errorf("failed to flush DNS: %v", err)
-	}
-
+	// if err := flushDNS(); err != nil {
+	// 	return nil, fmt.Errorf("failed to flush DNS: %v", err)
+	// }
 	timing := &Timing{}
 	t0 := time.Now().UTC().UnixMilli()
 	trace := &httptrace.ClientTrace{
@@ -77,7 +77,10 @@ func traceURL(url string) (*ResponseData, error) {
 		return nil, err
 	}
 	req = req.WithContext(httptrace.WithClientTrace(req.Context(), trace))
-	client := &http.Client{}
+	client := &http.Client{
+		Timeout: time.Duration(5) * time.Second,
+	}
+	defer client.CloseIdleConnections()
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err

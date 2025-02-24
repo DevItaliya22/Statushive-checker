@@ -15,6 +15,9 @@ func main() {
     }
 
     http.HandleFunc("/", api.Handler)
+    http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+        w.WriteHeader(http.StatusOK)
+    })
 
     fmt.Println("Server running on http://localhost:" + port)
     if err := http.ListenAndServe(":"+port, nil); err != nil {
